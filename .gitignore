@@ -1,0 +1,15 @@
+# другой проект и архивы
+kba/
+*.zip
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.env
+secrets/
+
+# Frontend
+node_modules/
+dist/
