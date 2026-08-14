@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -19,6 +21,41 @@ class LinkResponse(LinkBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+# --- Схемы для достижений (Achievement) ---
+class AchievementBase(BaseModel):
+    title: str
+    year: int | None = None
+    color_theme: str | None = None
+
+
+class AchievementCreate(AchievementBase):
+    pass
+
+
+class AchievementResponse(AchievementBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Схемы для событий (Event) ---
+class EventBase(BaseModel):
+    title: str
+    event_date: date
+    event_time: str | None = None
+    format: str | None = None
+
+
+class EventCreate(EventBase):
+    pass
+
+
+class EventResponse(EventBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # --- Схемы для профилей (EmployeeProfile) ---
 class ProfileBase(BaseModel):
     first_name: str
@@ -28,6 +65,11 @@ class ProfileBase(BaseModel):
     status: str | None = None
     avatar_url: str | None = None
     cover_url: str | None = None
+    department: str | None = None
+    hire_date: date | None = None
+    birth_date: date | None = None
+    employment_type: str | None = None
+    city: str | None = None
 
 
 class ProfileCreate(ProfileBase):
@@ -43,13 +85,21 @@ class ProfileUpdate(BaseModel):
     status: str | None = None
     avatar_url: str | None = None
     cover_url: str | None = None
+    department: str | None = None
+    hire_date: date | None = None
+    birth_date: date | None = None
+    employment_type: str | None = None
+    city: str | None = None
     access_pin: str | None = None
 
 
 class ProfileResponse(ProfileBase):
     id: int
     user_id: int
+    manager_id: int | None = None
     links: list[LinkResponse] = []
+    achievements: list[AchievementResponse] = []
+    events: list[EventResponse] = []
 
     # ДОБАВЛЕНО: Флаг администратора для фронтенда
     is_admin: bool = False

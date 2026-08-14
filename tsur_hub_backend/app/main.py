@@ -1,32 +1,31 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.endpoints import profiles, auth  # <--- Добавили auth в импорт
-# Или если у тебя auth лежит в другом месте, например: from app.api.endpoints import profiles, auth
+# ДОБАВИЛИ integration В ИМПОРТ
+from app.api.endpoints import profiles, auth, integration
 
 app = FastAPI(title="ЦУР.Команда API")
 
+# Оставили один чистый блок CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",
+        "*",
+    ],  # Разрешаем фронтенд и любые другие источники (для разработки)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Разрешаем запросы с вашего фронтенда
-    allow_credentials=True,
-    allow_methods=["*"],  # Разрешаем все методы (GET, POST и т.д.)
-    allow_headers=["*"],  # Разрешаем все заголовки
-)
-
 # Подключаем роутер с префиксом /api/profiles
 app.include_router(profiles.router, prefix="/api/profiles", tags=["Profiles"])
 
-# Подключаем роутер авторизации с префиксом /api/auth <--- ВОТ ЭТОЙ СТРОКИ НЕ ХВАТАЛО
+# Подключаем роутер авторизации с префиксом /api/auth
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+
+# ДОБАВЛЕНО: Подключаем роутер интеграции с префиксом /api/integration
+app.include_router(integration.router, prefix="/api/integration", tags=["Integration"])
 
 
 @app.get("/")

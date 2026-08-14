@@ -31,10 +31,10 @@ async def login(
 
     # 2. Безопасная проверка пароля через bcrypt
     password_valid = False
-    if user and user.password_hash:
+    if user and user.hashed_password:
         try:
             password_valid = bcrypt.checkpw(
-                form_data.password.encode("utf-8"), user.password_hash.encode("utf-8")
+                form_data.password.encode("utf-8"), user.hashed_password.encode("utf-8")
             )
         except Exception:
             password_valid = False
