@@ -1,3 +1,5 @@
+import os
+import secrets
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,11 +16,9 @@ class SyncUserRequest(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
-
-
-# Секретный токен для защиты (чтобы никто, кроме Базы Знаний, не мог создавать аккаунты)
-# В будущем его лучше вынести в файл .env
-INTEGRATION_SECRET_TOKEN = "super-secret-kba-token-2026"
+    position: str | None = None
+    department: str | None = None
+    city: str | None = None
 
 
 @router.post("/sync-user")
@@ -29,8 +29,14 @@ async def sync_user_from_kba(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    # 1. Проверяем, что запрос действительно пришел от нашей Базы Знаний
-    if x_integration_token != INTEGRATION_SECRET_TOKEN:
+    # Читаем токен из переменных окружения.
+    # Оставили старый токен в качестве дефолтного значения для обратной совместимости во время разработки
+    expected_token = os.getenv(
+        "INTEGRATION_SECRET_TOKEN", "super-secret-kba-token-2026"
+    )
+
+    # 1. Защита от тайминг-атак при сравнении строк
+    if not secrets.compare_digest(x_integration_token, expected_token):
         raise HTTPException(status_code=403, detail="Неверный токен интеграции")
 
     # 2. Проверяем, нет ли уже такого пользователя в Хабе
@@ -43,8 +49,7 @@ async def sync_user_from_kba(
             "message": "Пользователь с таким email уже существует в Хабе",
         }
 
-    # 3. Создаем технический аккаунт (пароль человек восстановит или задаст при первом входе,
-    # либо будет входить через единый SSO, если вы его настроите)
+    # 3. Создаем технический аккаунт
     new_user = User(
         email=data.email,
         hashed_password="synced_from_kba",  # Заглушка
@@ -53,13 +58,14 @@ async def sync_user_from_kba(
     db.add(new_user)
     await db.flush()  # Получаем ID нового пользователя, но еще не сохраняем намертво
 
-    # 4. Создаем связанный профиль сотрудника
+    # 4. Создаем связанный профиль сотрудника со всеми переданными данными
     new_profile = EmployeeProfile(
         user_id=new_user.id,
         first_name=data.first_name,
         last_name=data.last_name,
-        # Остальные поля (отдел, стаж, город) останутся пустыми (NULL),
-        # сотрудник заполнит их сам, когда зайдет в профиль.
+        position=data.position,
+        department=data.department,
+        city=data.city,
     )
     db.add(new_profile)
     await db.commit()

@@ -1,8 +1,9 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, Table
+from sqlalchemy import Boolean, Column, Date, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import relationship
+
 from app.core.database import (
     Base,
-)  # Убедитесь, что импорт Base соответствует вашему проекту
+)  # Убедись, что импорт Base соответствует твоему проекту
 
 # --- ТАБЛИЦЫ-СВЯЗКИ (Многие ко многим) ---
 
@@ -21,7 +22,7 @@ profile_achievements = Table(
         ForeignKey("hub.achievements.id", ondelete="CASCADE"),
         primary_key=True,
     ),
-    schema="hub",  # Указываем схему
+    schema="hub",
 )
 
 profile_events = Table(
@@ -47,14 +48,20 @@ profile_events = Table(
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = {"schema": "hub"}  # Помещаем таблицу в схему hub
+    __table_args__ = {"schema": "public"}
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    is_admin = Column(Boolean, default=False)
+    hashed_password = Column("password_hash", String, nullable=False)
+    role = Column(String, nullable=True)
 
     profile = relationship("EmployeeProfile", back_populates="user", uselist=False)
+
+    @property
+    def is_admin(self) -> bool:
+        if self.role is None:
+            return False
+        return str(self.role).lower() in ["admin", "superuser", "owner"]
 
 
 class EmployeeProfile(Base):
@@ -62,8 +69,9 @@ class EmployeeProfile(Base):
     __table_args__ = {"schema": "hub"}
 
     id = Column(Integer, primary_key=True, index=True)
+    # ВАЖНО: Внешний ключ ссылается на public.users.id
     user_id = Column(
-        Integer, ForeignKey("hub.users.id", ondelete="CASCADE"), unique=True
+        Integer, ForeignKey("public.users.id", ondelete="CASCADE"), unique=True
     )
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
@@ -74,7 +82,6 @@ class EmployeeProfile(Base):
     cover_url = Column(String, nullable=True)
     access_pin_hash = Column(String, nullable=True)
 
-    # НОВЫЕ ПОЛЯ ИЗ ТЗ (Этап 4)
     manager_id = Column(
         Integer,
         ForeignKey("hub.employee_profiles.id", ondelete="SET NULL"),
@@ -86,16 +93,18 @@ class EmployeeProfile(Base):
     employment_type = Column(String, nullable=True)
     city = Column(String, nullable=True)
 
+    # --- НОВЫЕ ПОЛЯ ---
+    desk = Column(String, nullable=True)
+    organization = Column(String, nullable=True)
+
     # СВЯЗИ
     user = relationship("User", back_populates="profile")
     links = relationship(
         "EmployeeLink", back_populates="profile", cascade="all, delete-orphan"
     )
 
-    # Связь с руководителем (ссылается на эту же таблицу)
     manager = relationship("EmployeeProfile", remote_side=[id], backref="subordinates")
 
-    # Связи для бейджей и событий
     achievements = relationship(
         "Achievement", secondary=profile_achievements, back_populates="profiles"
     )
@@ -103,7 +112,8 @@ class EmployeeProfile(Base):
 
     @property
     def is_admin(self) -> bool:
-        return self.user.is_admin if self.user else False
+        # Добавлена явная проверка is not None, чтобы избежать ошибок типизации (Pylance)
+        return self.user.is_admin if self.user is not None else False
 
 
 class EmployeeLink(Base):
@@ -129,9 +139,9 @@ class Achievement(Base):
     __table_args__ = {"schema": "hub"}
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)  # Например, "Проект года"
-    year = Column(Integer, nullable=True)  # Например, 2025
-    color_theme = Column(String, nullable=True)  # Например, "yellow", "blue", "purple"
+    title = Column(String, nullable=False)
+    year = Column(Integer, nullable=True)
+    color_theme = Column(String, nullable=True)
 
     profiles = relationship(
         "EmployeeProfile", secondary=profile_achievements, back_populates="achievements"
@@ -143,10 +153,11 @@ class Event(Base):
     __table_args__ = {"schema": "hub"}
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)  # "Демо новой версии"
+    title = Column(String, nullable=False)
     event_date = Column(Date, nullable=False)
-    event_time = Column(String, nullable=True)  # "10:00"
-    format = Column(String, nullable=True)  # "Онлайн"
+    event_time = Column(String, nullable=True)
+    format = Column(String, nullable=True)
+    end_date = Column(String, nullable=True)
 
     profiles = relationship(
         "EmployeeProfile", secondary=profile_events, back_populates="events"

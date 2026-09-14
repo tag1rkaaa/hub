@@ -5,6 +5,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
+    # Integration
+    INTEGRATION_SECRET: str = "change_me"
 
     # База данных
     DATABASE_URL: str = "postgresql+asyncpg://kba:kba@localhost:5432/kba"

@@ -28,10 +28,6 @@ class AchievementBase(BaseModel):
     color_theme: str | None = None
 
 
-class AchievementCreate(AchievementBase):
-    pass
-
-
 class AchievementResponse(AchievementBase):
     id: int
 
@@ -46,14 +42,26 @@ class EventBase(BaseModel):
     format: str | None = None
 
 
-class EventCreate(EventBase):
-    pass
-
-
 class EventResponse(EventBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+    # --- СХЕМЫ ДЛЯ СОЗДАНИЯ (АДМИНКА) ---
+
+
+class AchievementCreate(BaseModel):
+    title: str
+    year: int | None = None
+    color_theme: str | None = "blue"  # По умолчанию бейдж будет синим
+
+
+class EventCreate(BaseModel):
+    title: str
+    event_date: date
+    event_time: str | None = None
+    format: str | None = None
+    end_date: str | None = None
 
 
 # --- Схемы для профилей (EmployeeProfile) ---
@@ -70,6 +78,10 @@ class ProfileBase(BaseModel):
     birth_date: date | None = None
     employment_type: str | None = None
     city: str | None = None
+
+    # --- ДОБАВЛЕНЫ НОВЫЕ ПОЛЯ ---
+    desk: str | None = None
+    organization: str | None = None
 
 
 class ProfileCreate(ProfileBase):
@@ -91,6 +103,10 @@ class ProfileUpdate(BaseModel):
     employment_type: str | None = None
     city: str | None = None
     access_pin: str | None = None
+
+    # --- ДОБАВЛЕНЫ НОВЫЕ ПОЛЯ ---
+    desk: str | None = None
+    organization: str | None = None
 
 
 class ProfileResponse(ProfileBase):

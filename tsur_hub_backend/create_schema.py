@@ -1,6 +1,6 @@
 import asyncio
-from sqlalchemy.ext.asyncio import async_engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import text
+from app.core.database import engine
 
 
 async def main():
