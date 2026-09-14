@@ -1,238 +1,158 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-
-interface EmployeeProfile {
-    id: number;
-    first_name: string;
-    last_name: string;
-    position?: string;
-    status?: string;
-    avatar_url?: string;
-}
+import type { EmployeeProfile } from '../types';
+import { TeamWidgets } from '../components/TeamWidgets';
+import { AwayWidget } from '../components/AwayWidget';
 
 export const TeamPage: React.FC = () => {
-    const [profiles, setProfiles] = useState<EmployeeProfile[]>([]);
-    const [searchParams, setSearchParams] = useSearchParams();
-    const searchQuery = searchParams.get('search') || '';
-    const [search, setSearch] = useState(searchQuery);
+    const [team, setTeam] = useState<EmployeeProfile[]>([]);
     const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
 
-    const [isAdmin, setIsAdmin] = useState(false);
-    
-    // ДОБАВЛЕНО: Состояния для модального окна создания профиля
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [newProfile, setNewProfile] = useState({
-        first_name: '',
-        last_name: '',
-        position: '',
-        status: ''
-    });
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedDepartment, setSelectedDepartment] = useState('Все');
+    const [selectedCity, setSelectedCity] = useState('Все');
 
-    const fetchProfiles = async (query = '') => {
-        try {
-            setLoading(true);
-            const response = await api.get('/profiles/', {
-                params: { search: query || undefined }
-            });
-            setProfiles(response.data);
-        } catch (error) {
-            console.error('Ошибка при загрузке списка команды:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const checkAdminRights = async () => {
-        try {
-            const meRes = await api.get('/profiles/me');
-            if (meRes.data?.is_admin) {
-                setIsAdmin(true);
+    useEffect(() => {
+        const fetchTeam = async () => {
+            try {
+                setLoading(true);
+                const res = await api.get('/profiles/'); 
+                setTeam(res.data);
+            } catch (error) {
+                console.error('Ошибка при загрузке списка команды:', error);
+            } finally {
+                setLoading(false);
             }
-        } catch (e) {
-            // Игнорируем ошибку неавторизованного пользователя
-        }
-    };
-
-    useEffect(() => {
-        setSearch(searchQuery);
-        fetchProfiles(searchQuery);
-    }, [searchQuery]);
-
-    useEffect(() => {
-        checkAdminRights();
+        };
+        fetchTeam();
     }, []);
 
-    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        setSearch(value);
-        if (value) {
-            setSearchParams({ search: value });
-        } else {
-            setSearchParams({});
-        }
-    };
+    const departments = ['Все', ...Array.from(new Set(team.map(p => p.department).filter(Boolean)))];
+    const cities = ['Все', ...Array.from(new Set(team.map(p => p.city).filter(Boolean)))];
 
-    // ДОБАВЛЕНО: Функция отправки данных на сервер
-    const handleCreateProfile = async () => {
-        if (!newProfile.first_name || !newProfile.last_name) {
-            alert("Пожалуйста, заполните Имя и Фамилию.");
-            return;
-        }
+    const filteredTeam = team.filter(profile => {
+        const fullName = `${profile.first_name} ${profile.last_name}`.toLowerCase();
+        const position = (profile.position || '').toLowerCase();
+        const matchesSearch = fullName.includes(searchQuery.toLowerCase()) || position.includes(searchQuery.toLowerCase());
+        
+        const matchesDept = selectedDepartment === 'Все' || profile.department === selectedDepartment;
+        const matchesCity = selectedCity === 'Все' || profile.city === selectedCity;
 
-        try {
-            // Отправляем POST-запрос на создание профиля
-            await api.post('/profiles/', newProfile);
-            
-            // Закрываем модалку и очищаем форму
-            setIsCreateModalOpen(false);
-            setNewProfile({ first_name: '', last_name: '', position: '', status: '' });
-            
-            // Заново загружаем список, чтобы увидеть новичка
-            fetchProfiles(searchQuery);
-        } catch (error) {
-            console.error('Ошибка при создании профиля:', error);
-            alert("Произошла ошибка. Возможно, на бэкенде еще нет нужного эндпоинта.");
-        }
-    };
+        return matchesSearch && matchesDept && matchesCity;
+    });
+
+    if (loading) {
+        return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Загрузка команды...</div>;
+    }
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-8 relative">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-900">Команда</h1>
-                
-                {isAdmin && (
-                    <button 
-                        onClick={() => setIsCreateModalOpen(true)} // Открываем модалку по клику
-                        className="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition shadow-sm font-medium"
-                    >
-                        + Добавить сотрудника
-                    </button>
-                )}
-            </div>
-
-            <div className="mb-8">
-                <input
-                    type="text"
-                    value={search}
-                    onChange={handleSearchChange}
-                    placeholder="Поиск по ФИО или должности..."
-                    className="w-full md:w-1/3 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm transition"
-                />
-            </div>
-
-            {loading ? (
-                <div className="text-center py-12 text-gray-400">Загрузка сотрудников...</div>
-            ) : profiles.length === 0 ? (
-                <div className="text-center py-12 text-gray-500 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                    В базе пока нет ни одного профиля.
+        <div className="max-w-6xl mx-auto py-10 px-4 transition-colors duration-200">
+            <div className="mb-8 space-y-6">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white transition-colors duration-200">Команда</h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2 transition-colors duration-200">Справочник сотрудников и контактная информация</p>
                 </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {profiles.map((profile) => {
-                        const initials = `${profile.first_name?.[0] || ''}${profile.last_name?.[0] || ''}`.toUpperCase();
-                        return (
-                            <div
-                                key={profile.id}
-                                onClick={() => navigate(`/profile/${profile.id}`)}
-                                className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-100 transition cursor-pointer flex flex-col items-center text-center group relative"
-                            >
+
+                <div className="bg-white dark:bg-navy-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-navy-700 flex flex-col md:flex-row gap-4 transition-colors duration-200">
+                    <div className="flex-1">
+                        <input
+                            type="text"
+                            placeholder="Поиск по имени или должности..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-navy-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-navy-900 dark:text-white dark:placeholder-gray-400 transition-colors duration-200"
+                        />
+                    </div>
+                    
+                    <div className="md:w-64">
+                        <select
+                            value={selectedDepartment}
+                            onChange={(e) => setSelectedDepartment(e.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-navy-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-navy-900 dark:text-white transition-colors duration-200"
+                        >
+                            {departments.map((dept, idx) => (
+                                <option key={idx} value={dept as string}>{dept}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="md:w-48">
+                        <select
+                            value={selectedCity}
+                            onChange={(e) => setSelectedCity(e.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-200 dark:border-navy-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white dark:bg-navy-900 dark:text-white transition-colors duration-200"
+                        >
+                            {cities.map((city, idx) => (
+                                <option key={idx} value={city as string}>{city}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            {/* --- ПАНЕЛЬ ВИДЖЕТОВ --- */}
+            <AwayWidget />
+            <TeamWidgets />
+
+            {/* --- СПИСОК КОМАНДЫ --- */}
+            {filteredTeam.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-8">
+                    {filteredTeam.map(profile => (
+                        <div key={profile.id} className="bg-white dark:bg-navy-800 rounded-2xl shadow-sm border border-gray-100 dark:border-navy-700 p-6 flex flex-col items-center text-center hover:shadow-md transition-all duration-200 relative overflow-hidden">
+                            
+                            {profile.status && (
+                                <div className="absolute top-0 left-0 w-full bg-emerald-500 dark:bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-wider py-1">
+                                    {profile.status}
+                                </div>
+                            )}
+
+                            <div className={`w-20 h-20 rounded-full border-4 border-white dark:border-navy-700 shadow-sm flex items-center justify-center text-2xl font-bold text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-navy-900 mb-4 overflow-hidden ${profile.status ? 'mt-4' : ''}`}>
                                 {profile.avatar_url ? (
-                                    <img
-                                        src={profile.avatar_url}
-                                        alt={`${profile.first_name} ${profile.last_name}`}
-                                        className="w-20 h-20 rounded-full object-cover mb-4 ring-2 ring-gray-100 group-hover:ring-blue-200 transition"
-                                    />
+                                    <img src={profile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="w-20 h-20 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold mb-4 ring-2 ring-gray-100 group-hover:ring-blue-200 transition">
-                                        {initials || 'ЦУ'}
+                                    profile.first_name[0] + profile.last_name[0]
+                                )}
+                            </div>
+                            
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white transition-colors duration-200">{profile.first_name} {profile.last_name}</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1 transition-colors duration-200">{profile.position || 'Должность не указана'}</p>
+                            
+                            <div className="mt-4 flex flex-col gap-1 w-full text-sm">
+                                {profile.department && (
+                                    <div className="bg-gray-50 dark:bg-navy-900/50 text-gray-600 dark:text-gray-300 px-3 py-1.5 rounded-lg border border-gray-100 dark:border-navy-600 transition-colors duration-200">
+                                        {profile.department}
                                     </div>
                                 )}
-
-                                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition">
-                                    {profile.first_name} {profile.last_name}
-                                </h3>
-                                
-                                <p className="text-sm text-gray-500 mt-1">
-                                    {profile.position || 'Сотрудник'}
-                                </p>
-
-                                {profile.status && (
-                                    <span className="mt-4 px-3 py-1 text-xs bg-emerald-50 text-emerald-700 rounded-full font-medium">
-                                        {profile.status}
-                                    </span>
+                                {profile.city && (
+                                    <div className="bg-gray-50 dark:bg-navy-900/50 text-gray-600 dark:text-gray-300 px-3 py-1.5 rounded-lg border border-gray-100 dark:border-navy-600 transition-colors duration-200">
+                                        {profile.city}
+                                    </div>
                                 )}
                             </div>
-                        );
-                    })}
+
+                            <Link 
+                                to={`/profile/${profile.id}`} 
+                                className="mt-6 w-full py-2 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-400 font-medium rounded-xl hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors duration-200"
+                            >
+                                В профиль
+                            </Link>
+                        </div>
+                    ))}
                 </div>
-            )}
-
-            {/* ДОБАВЛЕНО: Само модальное окно */}
-            {isCreateModalOpen && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-6">Новый сотрудник</h2>
-                        
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Имя *</label>
-                                <input 
-                                    type="text" 
-                                    value={newProfile.first_name}
-                                    onChange={(e) => setNewProfile({...newProfile, first_name: e.target.value})}
-                                    className="w-full border border-gray-300 px-4 py-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                    placeholder="Иван"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Фамилия *</label>
-                                <input 
-                                    type="text" 
-                                    value={newProfile.last_name}
-                                    onChange={(e) => setNewProfile({...newProfile, last_name: e.target.value})}
-                                    className="w-full border border-gray-300 px-4 py-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                    placeholder="Иванов"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Должность</label>
-                                <input 
-                                    type="text" 
-                                    value={newProfile.position}
-                                    onChange={(e) => setNewProfile({...newProfile, position: e.target.value})}
-                                    className="w-full border border-gray-300 px-4 py-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                    placeholder="Аналитик"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Статус</label>
-                                <input 
-                                    type="text" 
-                                    value={newProfile.status}
-                                    onChange={(e) => setNewProfile({...newProfile, status: e.target.value})}
-                                    className="w-full border border-gray-300 px-4 py-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                    placeholder="Работает"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mt-8 flex justify-end gap-3">
-                            <button 
-                                onClick={() => setIsCreateModalOpen(false)}
-                                className="px-5 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl font-medium transition"
-                            >
-                                Отмена
-                            </button>
-                            <button 
-                                onClick={handleCreateProfile}
-                                className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium transition shadow-sm"
-                            >
-                                Добавить
-                            </button>
-                        </div>
-                    </div>
+            ) : (
+                <div className="text-center py-20 bg-white dark:bg-navy-800 rounded-2xl border border-gray-100 dark:border-navy-700 transition-colors duration-200 mt-8">
+                    <p className="text-gray-500 dark:text-gray-400 text-lg">По заданным фильтрам сотрудники не найдены.</p>
+                    <button 
+                        onClick={() => {
+                            setSearchQuery('');
+                            setSelectedDepartment('Все');
+                            setSelectedCity('Все');
+                        }}
+                        className="mt-4 text-brand-600 dark:text-brand-400 hover:underline"
+                    >
+                        Сбросить фильтры
+                    </button>
                 </div>
             )}
         </div>
